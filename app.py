@@ -64,11 +64,13 @@ st.markdown("Generate personalized cold emails by analyzing company websites wit
 # Sidebar
 with st.sidebar:
     st.header("Configuration")
-    if os.getenv("GEMINI_API_KEY"):
+    api_key = st.text_input("Enter your Gemini API Key", type="password", help="Get your API key from Google AI Studio")
+
+    if api_key:
         st.success("✅ API Key configured")
     else:
-        st.error("❌ API Key missing")
-        st.info("Add your GEMINI_API_KEY to .env file")
+        st.warning("⚠️ Please provide an API Key to run the crew")
+        # Stop execution if no key is provided, but allow viewing the UI
     
     st.markdown("---")
     st.subheader("How it works:")
@@ -110,7 +112,7 @@ if 'is_running' not in st.session_state:
 # Generate button
 col1, col2 = st.columns([1, 1])
 with col1:
-    generate_btn = st.button("🚀 Generate Cold Email", disabled=st.session_state.is_running or not url, type="primary")
+    generate_btn = st.button("🚀 Generate Cold Email", disabled=st.session_state.is_running or not url or not api_key, type="primary")
 with col2:
     clear_btn = st.button("🗑️ Clear Results")
 
@@ -120,7 +122,7 @@ if clear_btn:
     st.rerun()
 
 # Main processing logic
-if generate_btn and url:
+if generate_btn and url and api_key:
     st.session_state.is_running = True
     st.session_state.result = None
     
@@ -135,7 +137,7 @@ if generate_btn and url:
         # Initialize LLM
         llm = LLM(
             model="gemini/gemini-2.5-flash",
-            api_key=os.getenv("GEMINI_API_KEY")
+            api_key=api_key
         )
         
         # Create scraping tool with dynamic URL
