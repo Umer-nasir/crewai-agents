@@ -157,7 +157,7 @@ if generate_btn and url and gemini_key:
         
         # Initialize LLM
         llm = LLM(
-            model="gemini/gemini-2.0-flash", 
+            model="gemini/gemini-flash-latest", 
             api_key=gemini_key
         )
         
