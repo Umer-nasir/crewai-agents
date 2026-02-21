@@ -1,7 +1,10 @@
 import streamlit as st
 import os
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from crewai import Agent, Task, Crew, Process, LLM
-from crewai_tools import ScrapeWebsiteTool
+from crewai_tools import ScrapeWebsiteTool, SerperDevTool
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -9,9 +12,9 @@ load_dotenv()
 
 # Configure Streamlit page
 st.set_page_config(
-    page_title="CrewAI Cold Email Generator",
+    page_title="CrewAI Cold Email Outreach",
     page_icon="📧",
-    layout="centered"
+    layout="wide"
 )
 
 # Custom CSS for better styling
@@ -58,50 +61,51 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Header
-st.markdown("<h1 class='main-header'>📧 CrewAI Cold Email Generator</h1>", unsafe_allow_html=True)
-st.markdown("Generate personalized cold emails by analyzing company websites with AI agents")
+st.markdown("<h1 class='main-header'>📧 CrewAI Cold Email Outreach</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;'>Research target companies, match services, and prepare outreach emails with AI agents.</p>", unsafe_allow_html=True)
 
 # Sidebar
 with st.sidebar:
-    st.header("Configuration")
-    api_key = st.text_input("Enter your Gemini API Key", type="password", help="Get your API key from Google AI Studio")
+    st.header("🔑 Configuration")
+    gemini_key = st.text_input("Enter Gemini API Key", type="password", value=os.getenv("GEMINI_API_KEY", ""))
+    serper_key = st.text_input("Enter Serper API Key (Optional)", type="password", value=os.getenv("SERPER_API_KEY", ""), help="Used for finding contact persons")
 
-    if api_key:
-        st.success("✅ API Key configured")
-    else:
-        st.warning("⚠️ Please provide an API Key to run the crew")
-        # Stop execution if no key is provided, but allow viewing the UI
-    
+    st.markdown("---")
+    st.header("🏢 Your Agency Services")
+    agency_services = st.text_area(
+        "Describe your services:",
+        height=200,
+        placeholder="1. AI Automation: We build agents...\n2. UI/UX: We redesign...",
+        value="""1. Ad Optimization & Monetization: Best for websites who have good content but ugly ads. We provide best adds for your website.
+2. UI/UX Redesign (Visual Optimization): Best for websites who have dull colors or very bright colors that affects eyes of visitors. Our website provide best vision for the visitors eye.
+3. AI Automation & Workflow Systems: Best for companies with manual, repetitive tasks. We build agents to save time."""
+    )
+
+    st.markdown("---")
+    with st.expander("📧 Optional: SMTP Email Settings"):
+        st.info("Fill these to enable sending emails directly from the app.")
+        smtp_server = st.text_input("SMTP Server", value="smtp.gmail.com")
+        smtp_port = st.number_input("SMTP Port", value=587)
+        smtp_user = st.text_input("SMTP User (Email)")
+        smtp_password = st.text_input("SMTP Password", type="password")
+        sender_name = st.text_input("Sender Name", value="Agent Outreach")
+
     st.markdown("---")
     st.subheader("How it works:")
     st.markdown("""
-    1. **Researcher**: Analyzes company website
-    2. **Strategist**: Matches needs with services
-    3. **Writer**: Crafts personalized email
-    """)
-    
-    st.markdown("---")
-    st.subheader("Agency Services:")
-    st.markdown("""
-    1. Content Related Ads
-    2. Neutral Visions
-    3. AI Automation
+    1. **Researcher**: Analyzes company website.
+    2. **Strategist**: Matches needs with services.
+    3. **Writer**: Crafts personalized email.
+    4. **Outreach**: Finds contact and prepares final version.
     """)
 
 # Main input area
-st.markdown("### Enter Target Company URL")
+st.markdown("### 🎯 Target Company")
 url = st.text_input(
     "Website URL", 
     placeholder="https://example.com",
     help="Enter the URL of the company you want to research"
 )
-
-# Agency services (same as in your business.py)
-agency_services = """
-1. Content Related Ads: Best for websites who have good content but ugly ads. We provide best adds for your website.
-2. Neutral visions for visually overwhelming, hard to look at, or dull/boring websites: Best for websites who have dull colors or very bright colors that affects eyes of visitors or another they do not admire the visitors. Our website provide best vision for the visitors eye that will make them to admire the website.
-3. AI Automation: Best for companies with manual, repetitive tasks. We build agents to save time.
-"""
 
 # Initialize session state
 if 'result' not in st.session_state:
@@ -112,7 +116,7 @@ if 'is_running' not in st.session_state:
 # Generate button
 col1, col2 = st.columns([1, 1])
 with col1:
-    generate_btn = st.button("🚀 Generate Cold Email", disabled=st.session_state.is_running or not url or not api_key, type="primary")
+    generate_btn = st.button("🚀 Run Outreach Crew", disabled=st.session_state.is_running or not url or not gemini_key, type="primary")
 with col2:
     clear_btn = st.button("🗑️ Clear Results")
 
@@ -121,8 +125,25 @@ if clear_btn:
     st.session_state.is_running = False
     st.rerun()
 
+def send_email(subject, body, to_email):
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = f"{sender_name} <{smtp_user}>"
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_user, smtp_password)
+        server.send_message(msg)
+        server.quit()
+        return True
+    except Exception as e:
+        return str(e)
+
 # Main processing logic
-if generate_btn and url and api_key:
+if generate_btn and url and gemini_key:
     st.session_state.is_running = True
     st.session_state.result = None
     
@@ -130,27 +151,27 @@ if generate_btn and url and api_key:
         # Status indicator
         status_placeholder = st.empty()
         status_placeholder.markdown(
-            '<div class="status-box status-running">🤖 Researcher is analyzing the website...</div>', 
+            '<div class="status-box status-running">🤖 Initializing Crew...</div>', 
             unsafe_allow_html=True
         )
         
         # Initialize LLM
         llm = LLM(
-            model="gemini/gemini-2.5-flash",
-            api_key=api_key
+            model="gemini/gemini-2.0-flash", # Updated to a more stable version for deployment
+            api_key=gemini_key
         )
         
-        # Create scraping tool with dynamic URL
+        # Tools
         scrape_tool = ScrapeWebsiteTool(url=url)
+        search_tool = SerperDevTool(api_key=serper_key) if serper_key else None
         
-        # Create agents (same as your original code)
+        # Agents
         researcher = Agent(
             role='Business Intelligence Analyst',
-            goal='Analyze the target company website and identify their core business and potential weaknesses.',
-            backstory="You are an expert at analyzing businesses just by looking at their landing page. You look for what they do and where they might be struggling.",
+            goal=f'Analyze {url} and identify their core business and potential weaknesses.',
+            backstory="Expert at analyzing businesses from their landing page. You look for what they do and where they might be struggling.",
             tools=[scrape_tool],
             verbose=False,
-            allow_delegation=True,
             memory=True,
             llm=llm
         )
@@ -159,12 +180,10 @@ if generate_btn and url and api_key:
             role='Agency Strategist',
             goal='Match the target company needs with ONE of our agency services.',
             backstory=f"""You work for a top-tier digital agency.
-            Your goal is to read the analysis of a prospect and decide which of OUR services to pitch.
+            Pick the best service for this client and explain why.
             
-            OUR SERVICES KNOWLEDGE BASE:
-            {agency_services}
-            
-            You must pick the SINGLE best service for this specific client and explain why.""",
+            OUR SERVICES:
+            {agency_services}""",
             verbose=False,
             memory=True,
             llm=llm
@@ -172,102 +191,94 @@ if generate_btn and url and api_key:
         
         writer = Agent(
             role='Senior Sales Copywriter',
-            goal='Write a personalized cold email that sounds human and professional and remove jerks.',
-            backstory="""You write emails that get replies. You never sound robotic.
-            You mention specific details found by the Researcher to prove we actually looked at their site.""",
+            goal='Write a personalized cold email that sounds human and professional.',
+            backstory="You write emails that get replies. You mention specific details found by the Researcher.",
             verbose=False,
-            llm=llm,
+            llm=llm
         )
-        
-        # Update status
-        status_placeholder.markdown(
-            '<div class="status-box status-running">🧠 Strategist is matching services...</div>', 
-            unsafe_allow_html=True
-        )
-        
-        # Create tasks (with dynamic URL)
-        task_analyze = Task(
-            description=f"Scrape the website {url}. Summarize what the company does and identify 1 key area where they could improve (e.g., design, traffic, automation).",
-            expected_output="A brief summary of the company and their potential pain points.",
-            agent=researcher
-        )
-        
-        task_strategize = Task(
-            description="Based on the analysis, pick ONE service from our Agency Knowledge Base that solves their problem. Explain the match.",
-            expected_output="The selected service and the reasoning for the match.",
-            agent=strategist
-        )
-        
-        task_write = Task(
-            description="Draft a cold email to the CEO of the target company. Pitch the selected service. Keep it under 150 words.",
-            expected_output="A professional cold email ready to send and jerks free.",
-            agent=writer
-        )
-        
-        # Update status
-        status_placeholder.markdown(
-            '<div class="status-box status-running">✍️ Writer is crafting the email...</div>', 
-            unsafe_allow_html=True
-        )
-        
-        # Create and run crew (same as your original code)
-        sales_crew = Crew(
-            agents=[researcher, strategist, writer],
-            tasks=[task_analyze, task_strategize, task_write],
-            process=Process.sequential,
+
+        outreach_specialist = Agent(
+            role='Email Outreach Specialist',
+            goal='Identify the best person to contact (CEO, Founder, or Marketing Head) and finalize the email.',
+            backstory="You are great at finding contact persons. You take the draft email and ensure it is addressed to the right person and follows best outreach practices.",
+            tools=[search_tool] if search_tool else [],
             verbose=False,
             llm=llm
         )
         
-        # Run the crew
+        # Tasks
+        task_analyze = Task(
+            description=f"Scrape {url}. Summarize what the company does and identify 1 key area for improvement.",
+            expected_output="A summary of the company and their potential pain points.",
+            agent=researcher
+        )
+        
+        task_strategize = Task(
+            description="Based on the analysis, pick ONE service from our services that solves their problem.",
+            expected_output="The selected service and reasoning.",
+            agent=strategist
+        )
+        
+        task_write = Task(
+            description="Draft a personalized cold email pitching the selected service. Keep it under 150 words.",
+            expected_output="A professional cold email draft.",
+            agent=writer
+        )
+
+        task_outreach = Task(
+            description=f"Find the likely CEO or Marketing Head of {url}. If tools are missing, use general placeholder [CEO NAME]. Finalize the email draft with this information.",
+            expected_output="A final email with recipient name and draft.",
+            agent=outreach_specialist
+        )
+        
+        # Run Crew
+        status_placeholder.markdown('<div class="status-box status-running">🚀 Crew is working on your outreach...</div>', unsafe_allow_html=True)
+        
+        sales_crew = Crew(
+            agents=[researcher, strategist, writer, outreach_specialist],
+            tasks=[task_analyze, task_strategize, task_write, task_outreach],
+            process=Process.sequential,
+            verbose=False,
+        )
+        
         result = sales_crew.kickoff()
         
-        # Store result and update status
         st.session_state.result = result
         st.session_state.is_running = False
-        status_placeholder.markdown(
-            '<div class="status-box status-complete">✅ Email generated successfully!</div>', 
-            unsafe_allow_html=True
-        )
+        status_placeholder.markdown('<div class="status-box status-complete">✅ Outreach plan generated!</div>', unsafe_allow_html=True)
         
     except Exception as e:
         st.session_state.is_running = False
         status_placeholder.empty()
         st.error(f"❌ Error: {str(e)}")
-        st.info("Make sure your API key is correct and the website is accessible.")
 
 # Display results
 if st.session_state.result:
     st.markdown("---")
-    st.subheader("📧 Generated Cold Email")
+    st.subheader("📧 Final Outreach Plan & Email")
     
-    # Convert result to string to handle CrewOutput object
     result_str = str(st.session_state.result)
     
-    # Display the email in a nice container
-    st.markdown(
-        f"""
-        <div class="email-container">
-            <h4>To: CEO of Target Company</h4>
-            <h4>Subject: Quick question about your website</h4>
-            <p>{result_str}</p>
-        </div>
-        """, 
-        unsafe_allow_html=True
-    )
+    st.markdown(f'<div class="email-container">{result_str}</div>', unsafe_allow_html=True)
     
-    # Copy button
+    # Optional Sending
+    if smtp_user and smtp_password:
+        st.markdown("### 📤 Send this email?")
+        target_email = st.text_input("Recipient Email Address", placeholder="ceo@company.com")
+        if st.button("✈️ Send Now"):
+            send_res = send_email("Enhancing your website experience", result_str, target_email)
+            if send_res is True:
+                st.success("✅ Email sent successfully!")
+            else:
+                st.error(f"❌ Failed to send: {send_res}")
+    
     st.download_button(
-        label="📋 Copy Email Text",
+        label="📋 Download Email Text",
         data=result_str,
-        file_name="cold_email.txt",
+        file_name="cold_outreach.txt",
         mime="text/plain"
     )
-    
-    # Word count
-    word_count = len(result_str.split())
-    st.caption(f"Word count: {word_count}/150")
 
 # Footer
 st.markdown("---")
-st.caption("Powered by CrewAI and Streamlit | Keep your emails under 150 words for best results")
+st.caption("Powered by CrewAI | Automated Outreach Suite")

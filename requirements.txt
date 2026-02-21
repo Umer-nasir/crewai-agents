@@ -3,3 +3,5 @@ crewai
 crewai-tools
 python-dotenv
 google-generativeai
+duckduckgo-search
+pydantic
