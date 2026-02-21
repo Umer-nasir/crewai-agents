@@ -157,7 +157,7 @@ if generate_btn and url and gemini_key:
         
         # Initialize LLM
         llm = LLM(
-            model="gemini/gemini-flash-latest", 
+            model="gemini/gemini-2.5-flash", 
             api_key=gemini_key
         )
         
@@ -282,4 +282,4 @@ if st.session_state.result:
 
 # Footer
 st.markdown("---")
-st.caption("Powered by CrewAI | Automated Outreach Suite")
+st.caption("Powered by  | Automated Outreach Suite")
