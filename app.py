@@ -157,7 +157,7 @@ if generate_btn and url and gemini_key:
         
         # Initialize LLM
         llm = LLM(
-            model="gemini/gemini-1.5-flash-latest", 
+            model="gemini/gemini-2.0-flash", 
             api_key=gemini_key
         )
         
@@ -239,6 +239,7 @@ if generate_btn and url and gemini_key:
             tasks=[task_analyze, task_strategize, task_write, task_outreach],
             process=Process.sequential,
             verbose=False,
+            llm=llm
         )
         
         result = sales_crew.kickoff()
