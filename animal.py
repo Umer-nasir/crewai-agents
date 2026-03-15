@@ -1,17 +1,20 @@
+import streamlit as st
 from crewai import Agent, Task, Crew, LLM
 from crewai_tools import SerperDevTool
 from dotenv import load_dotenv
 import os
 
-
 load_dotenv()
+
+st.title("📚 Intelligent Research Assistant")
+st.write("Enter a topic you want to learn about, and our AI crew will research, plan, write, and review a comprehensive guide for you.")
 
 llm = LLM(
     model="groq/llama-3.1-8b-instant",
     api_key=os.getenv("GROQ_API_KEY")
 )
 search_tool = SerperDevTool()
-topic = input("Enter a topic you want to learn about: ")
+topic = st.text_input("Enter a topic you want to learn about:")
 
 researcher_agent = Agent(
     role="Researcher",
@@ -85,6 +88,15 @@ crew = Crew(
     verbose=False
 )
 
-result = crew.kickoff(inputs={"topic": topic})
-print("FINAL OUTPUT:\n")
-print(result)
+if st.button("Start Research"):
+    if topic:
+        with st.spinner(f"Researching and writing about '{topic}'... This may take a few minutes."):
+            try:
+                result = crew.kickoff(inputs={"topic": topic})
+                st.success("Research Complete!")
+                st.markdown("### Final Output:")
+                st.markdown(str(result))
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
+    else:
+        st.warning("Please enter a topic first.")
